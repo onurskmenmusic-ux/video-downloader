@@ -5,7 +5,6 @@ import yt_dlp
 
 app = FastAPI()
 
-# Tüm origin, metot ve header'lara tam yetki
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -32,19 +31,29 @@ async def get_download_link(request: DownloadRequest):
     elif request.quality == "1080p":
         format_option = "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best"
 
+    # YouTube Bot Engellerini Aşma Ayarları
     ydl_opts = {
         'format': format_option,
         'quiet': True,
         'no_warnings': True,
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'web']
+            }
+        }
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(request.url, download=False)
-            download_url = info.get('url')
             
+            download_url = info.get('url')
             if not download_url and 'requested_formats' in info:
                 download_url = info['requested_formats'][0]['url']
+
+            if not download_url:
+                raise HTTPException(status_code=400, detail="İndirme bağlantısı ayıklanamadı.")
 
             return {
                 "success": True,
@@ -54,7 +63,8 @@ async def get_download_link(request: DownloadRequest):
                 "quality": request.quality
             }
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        # Hatayı doğrudan WordPress'e bildir
+        raise HTTPException(status_code=400, detail=f"yt-dlp Hatası: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

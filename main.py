@@ -8,7 +8,7 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=False,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -19,27 +19,27 @@ class DownloadRequest(BaseModel):
 
 @app.get("/")
 async def root():
-    return {"status": "ok", "message": "API Servisi Aktif"}
+    return {"status": "ok", "message": "API Aktif"}
 
 @app.post("/api/download")
 async def get_download_link(request: DownloadRequest):
     format_option = "best"
     if request.quality == "mp3":
         format_option = "bestaudio/best"
-    elif request.quality == "720p":
+    elif request.quality == "720":
         format_option = "bestvideo[height<=720]+bestaudio/best[height<=720]/best"
-    elif request.quality == "1080p":
+    elif request.quality == "1080":
         format_option = "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best"
 
-    # YouTube Bot Engellerini Aşma Ayarları
+    # YouTube Datacenter IP Engeli Aşma Konfigürasyonu (iOS Client)
     ydl_opts = {
         'format': format_option,
         'quiet': True,
         'no_warnings': True,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'web']
+                'player_client': ['ios', 'mweb'],
+                'skip': ['hls', 'dash']
             }
         }
     }
@@ -53,19 +53,13 @@ async def get_download_link(request: DownloadRequest):
                 download_url = info['requested_formats'][0]['url']
 
             if not download_url:
-                raise HTTPException(status_code=400, detail="İndirme bağlantısı ayıklanamadı.")
+                raise HTTPException(status_code=400, detail="Bağlantı ayıklanamadı.")
 
             return {
                 "success": True,
                 "title": info.get('title', 'Video'),
                 "download_url": download_url,
-                "thumbnail": info.get('thumbnail', ''),
-                "quality": request.quality
+                "thumbnail": info.get('thumbnail', '')
             }
     except Exception as e:
-        # Hatayı doğrudan WordPress'e bildir
-        raise HTTPException(status_code=400, detail=f"yt-dlp Hatası: {str(e)}")
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+        raise HTTPException(status_code=400, detail=str(e))

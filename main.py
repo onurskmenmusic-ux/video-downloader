@@ -5,7 +5,7 @@ import yt_dlp
 
 app = FastAPI()
 
-# WordPress sitenizden gelen isteklere izin vermek için CORS ayarı
+# CORS Ayarlari - Tüm domainlerden (app.baypega.com.tr dahil) gelen isteklere izin ver
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,19 +18,23 @@ class DownloadRequest(BaseModel):
     url: str
     quality: str  # "mp3", "720p", "1080p"
 
+@app.get("/")
+async def root():
+    return {"status": "ok", "message": "API Servisi Aktif"}
+
 @app.post("/api/download")
 async def get_download_link(
     request: DownloadRequest, 
     x_user_logged_in: str = Header(default="false")
 ):
-    # 1080p İndirme Yetki Kontrolü
+    # 1080p Indirme Yetki Kontrolu
     if request.quality == "1080p" and x_user_logged_in != "true":
         raise HTTPException(
             status_code=403, 
             detail="1080p video indirmek için üye girişi yapmanız gerekmektedir!"
         )
 
-    # Kaliteye göre yt-dlp format ayarı
+    # Kaliteye göre yt-dlp format ayari
     format_option = "best"
     if request.quality == "mp3":
         format_option = "bestaudio/best"

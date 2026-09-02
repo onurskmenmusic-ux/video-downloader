@@ -5,11 +5,11 @@ import yt_dlp
 
 app = FastAPI()
 
-# En geniş CORS İzinleri
+# Tüm origin, metot ve header'lara tam yetki
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -17,7 +17,6 @@ app.add_middleware(
 class DownloadRequest(BaseModel):
     url: str
     quality: str
-    is_logged_in: str = "false"
 
 @app.get("/")
 async def root():
@@ -25,13 +24,6 @@ async def root():
 
 @app.post("/api/download")
 async def get_download_link(request: DownloadRequest):
-    # 1080p İndirme Yetki Kontrolü
-    if request.quality == "1080p" and request.is_logged_in != "true":
-        raise HTTPException(
-            status_code=403, 
-            detail="1080p video indirmek için üye girişi yapmanız gerekmektedir!"
-        )
-
     format_option = "best"
     if request.quality == "mp3":
         format_option = "bestaudio/best"

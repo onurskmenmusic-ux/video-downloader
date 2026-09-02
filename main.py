@@ -1,22 +1,36 @@
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import yt_dlp
 
 app = FastAPI()
 
-# CORS Ayarlari - Tüm domainlerden (app.baypega.com.tr dahil) gelen isteklere izin ver
+# Tüm Origin, Header ve Metotlara Tam İzin Veren CORS Yapılandırması
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
+
+# Tarayıcıların Preflight (OPTIONS) isteklerini manuel onaylama
+@app.options("/{full_path:path}")
+async def options_handler(request: Request, full_path: str):
+    return JSONResponse(
+        content={"status": "ok"},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, X-User-Logged-In, Authorization",
+        },
+    )
 
 class DownloadRequest(BaseModel):
     url: str
-    quality: str  # "mp3", "720p", "1080p"
+    quality: str
 
 @app.get("/")
 async def root():
@@ -27,14 +41,12 @@ async def get_download_link(
     request: DownloadRequest, 
     x_user_logged_in: str = Header(default="false")
 ):
-    # 1080p Indirme Yetki Kontrolu
     if request.quality == "1080p" and x_user_logged_in != "true":
         raise HTTPException(
             status_code=403, 
             detail="1080p video indirmek için üye girişi yapmanız gerekmektedir!"
         )
 
-    # Kaliteye göre yt-dlp format ayari
     format_option = "best"
     if request.quality == "mp3":
         format_option = "bestaudio/best"

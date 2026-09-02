@@ -31,35 +31,46 @@ async def get_download_link(request: DownloadRequest):
     elif request.quality == "1080":
         format_option = "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best"
 
-    # YouTube Datacenter IP Engeli Aşma Konfigürasyonu (iOS Client)
-    ydl_opts = {
-        'format': format_option,
-        'quiet': True,
-        'no_warnings': True,
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['ios', 'mweb'],
-                'skip': ['hls', 'dash']
+    # Farklı istemcileri sırayla deneyerek engelleri aşma konfigürasyonu
+    client_configs = [
+        ['ios', 'mweb'],
+        ['android', 'web'],
+        ['tv_embedded']
+    ]
+
+    last_error = ""
+
+    for clients in client_configs:
+        ydl_opts = {
+            'format': format_option,
+            'quiet': True,
+            'no_warnings': True,
+            'skip_download': True,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': clients,
+                    'skip': ['hls', 'dash']
+                }
             }
         }
-    }
 
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(request.url, download=False)
-            
-            download_url = info.get('url')
-            if not download_url and 'requested_formats' in info:
-                download_url = info['requested_formats'][0]['url']
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(request.url, download=False)
+                
+                download_url = info.get('url')
+                if not download_url and 'requested_formats' in info:
+                    download_url = info['requested_formats'][0]['url']
 
-            if not download_url:
-                raise HTTPException(status_code=400, detail="Bağlantı ayıklanamadı.")
+                if download_url:
+                    return {
+                        "success": True,
+                        "title": info.get('title', 'Video'),
+                        "download_url": download_url,
+                        "thumbnail": info.get('thumbnail', '')
+                    }
+        except Exception as e:
+            last_error = str(e)
+            continue
 
-            return {
-                "success": True,
-                "title": info.get('title', 'Video'),
-                "download_url": download_url,
-                "thumbnail": info.get('thumbnail', '')
-            }
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    raise HTTPException(status_code=400, detail=f"Bağlantı alınamadı: {last_error}")
